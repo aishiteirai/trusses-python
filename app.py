@@ -36,6 +36,16 @@ class TrussApp:
         self.logo_label = ctk.CTkLabel(self.sidebar, text="FERRAMENTAS", font=ctk.CTkFont(size=20, weight="bold"))
         self.logo_label.pack(padx=20, pady=(20, 10))
 
+        # --- MELHORIA 1: Status em Destaque no Topo ---
+        self.lbl_status = ctk.CTkLabel(self.sidebar, 
+                                       text="Modo: Seleção", 
+                                       font=ctk.CTkFont(size=14, weight="bold"),
+                                       fg_color="#555555",    # Cor inicial (Cinza)
+                                       text_color="white",
+                                       corner_radius=10,
+                                       height=35)
+        self.lbl_status.pack(padx=20, pady=(0, 20), fill="x")
+
         # Botões
         self.btn_node = ctk.CTkButton(self.sidebar, text="Adicionar Nó", command=lambda: self.set_mode("NODE"),
                                       fg_color="#3B8ED0", hover_color="#36719F")
@@ -65,8 +75,7 @@ class TrussApp:
                                        fg_color="transparent", border_width=2, text_color=("gray10", "#DCE4EE"))
         self.btn_clear.pack(padx=20, pady=10)
 
-        self.lbl_status = ctk.CTkLabel(self.sidebar, text="Modo: Seleção", font=ctk.CTkFont(size=12))
-        self.lbl_status.pack(side="bottom", pady=20)
+        # (Removi o lbl_status antigo daqui de baixo)
 
         # 2. Canvas
         self.canvas_frame = ctk.CTkFrame(root)
@@ -78,25 +87,22 @@ class TrussApp:
         self.canvas.bind("<Button-1>", self.on_click)
         self.draw_grid()
 
-    # --- JANELAS PERSONALIZADAS (NOVAS) ---
+    # --- JANELAS PERSONALIZADAS ---
     
     def open_support_dialog(self, node):
-        """Abre uma janela flutuante bonita para escolher o apoio"""
         dialog = ctk.CTkToplevel(self.root)
         dialog.title("Configurar Apoio")
         dialog.geometry("300x200")
         dialog.resizable(False, False)
         
-        # Faz a janela ficar por cima de tudo (Modal)
         dialog.transient(self.root)
         dialog.grab_set()
 
         ctk.CTkLabel(dialog, text="Selecione o Tipo de Apoio:", font=("Arial", 14, "bold")).pack(pady=20)
 
-        # Dropdown (ComboBox)
         combo_tipo = ctk.CTkComboBox(dialog, values=["Pino (Fixo X e Y)", "Rolet (Fixo Y)"], width=200)
         combo_tipo.pack(pady=10)
-        combo_tipo.set("Pino (Fixo X e Y)") # Valor padrão
+        combo_tipo.set("Pino (Fixo X e Y)")
 
         def confirm():
             selection = combo_tipo.get()
@@ -106,22 +112,21 @@ class TrussApp:
                 node.support = Support(restrain_x=False, restrain_y=True)
             
             self.redraw()
-            dialog.destroy() # Fecha a janela
+            dialog.destroy()
 
         ctk.CTkButton(dialog, text="Confirmar", command=confirm, fg_color="#2CC985").pack(pady=20)
 
     def open_load_dialog(self, node):
-        """Abre uma janela flutuante bonita para digitar a carga"""
         dialog = ctk.CTkToplevel(self.root)
         dialog.title("Adicionar Carga")
-        dialog.geometry("400x320")
+        # MELHORIA 2: Ajuste de tamanho da janela
+        dialog.geometry("300x320")
         dialog.resizable(False, False)
         dialog.transient(self.root)
         dialog.grab_set()
 
         ctk.CTkLabel(dialog, text="Configurar Força", font=("Arial", 14, "bold")).pack(pady=15)
 
-        # Inputs
         ctk.CTkLabel(dialog, text="Magnitude (N):").pack(pady=(5,0))
         entry_mag = ctk.CTkEntry(dialog, placeholder_text="Ex: 1000")
         entry_mag.pack(pady=5)
@@ -138,18 +143,31 @@ class TrussApp:
                 self.redraw()
                 dialog.destroy()
             except ValueError:
-                # Se digitar letra em vez de número, a borda fica vermelha
                 entry_mag.configure(border_color="red")
                 entry_ang.configure(border_color="red")
 
-        ctk.CTkButton(dialog, text="Aplicar Carga", command=confirm, fg_color="#9C27B0").pack(pady=20)
+        # MELHORIA 2: Botão mais alto (height=40)
+        ctk.CTkButton(dialog, text="Aplicar Carga", command=confirm, 
+                      fg_color="#9C27B0", height=40, font=("Arial", 12, "bold")).pack(pady=20)
 
     # --- LÓGICA DO PROGRAMA ---
 
     def set_mode(self, mode):
         self.mode = mode
         self.temp_node = None
-        self.lbl_status.configure(text=f"Modo Atual: {mode}")
+        
+        # MELHORIA 1: Cores dinâmicas para o Status
+        mode_data = {
+            "NODE":    ("Adicionar Nó", "#3B8ED0"),    # Azul
+            "MEMBER":  ("Adicionar Barra", "#E19600"), # Laranja
+            "SUPPORT": ("Adicionar Apoio", "#8D6F64"), # Marrom
+            "LOAD":    ("Adicionar Carga", "#9C27B0"), # Roxo
+            "SELECT":  ("Seleção", "#555555")          # Cinza
+        }
+        
+        text, color = mode_data.get(mode, (mode, "#555555"))
+        self.lbl_status.configure(text=text, fg_color=color)
+        
         self.redraw()
 
     def draw_grid(self):
@@ -195,18 +213,17 @@ class TrussApp:
 
         elif self.mode == "SUPPORT":
             if clicked_node:
-                # CHAMA A NOVA JANELA BONITA
                 self.open_support_dialog(clicked_node)
 
         elif self.mode == "LOAD":
             if clicked_node:
-                # CHAMA A NOVA JANELA BONITA
                 self.open_load_dialog(clicked_node)
 
     def clear_all(self):
         self.nodes = []
         self.members = []
         self.temp_node = None
+        self.set_mode("SELECT") # Reseta para seleção ao limpar
         self.redraw()
 
     def calculate(self):
@@ -254,11 +271,11 @@ class TrussApp:
 
             self.canvas.create_oval(n.x-NODE_RADIUS, n.y-NODE_RADIUS, n.x+NODE_RADIUS, n.y+NODE_RADIUS, fill=fill, outline="black")
             
-            # Cargas (Ajustadas para Y para cima = Positivo)
+            # Cargas
             if n.load:
                 rad = math.radians(n.load.angle)
                 dx = 50 * math.cos(rad)
-                dy = -50 * math.sin(rad) # Correção visual do eixo Y
+                dy = -50 * math.sin(rad) # Correção Visual do Y
                 self.canvas.create_line(n.x, n.y, n.x+dx, n.y+dy, arrow=tk.LAST, fill="#8E44AD", width=3)
                 self.canvas.create_text(n.x+dx+15, n.y+dy, text=f"{n.load.magnitude}N", fill="#8E44AD", font=("Arial", 10, "bold"))
 
