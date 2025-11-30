@@ -1,57 +1,81 @@
 import tkinter as tk
 from tkinter import simpledialog, messagebox
+import customtkinter as ctk  # Biblioteca moderna
 import math
 from models import Node, Member, Truss, Support, Load
 from solver import TrussSolver
 
-# Configurações Visuais
-GRID_SIZE = 40  # Tamanho do quadrado do grid em pixels
+# --- Configurações Visuais Modernas ---
+ctk.set_appearance_mode("System")  # "Light", "Dark" ou "System"
+ctk.set_default_color_theme("blue")  # Tema de cores padrão
+
+GRID_SIZE = 40
 NODE_RADIUS = 5
 SNAP_TOLERANCE = 15
-
 
 class TrussApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Truss Solver - Estilo MDSolids")
-        self.root.geometry("1000x700")
+        self.root.title("Truss Solver - Modern UI")
+        self.root.geometry("1100x700")
 
         # --- Estado da Aplicação ---
-        self.mode = "SELECT"  # Modos: SELECT, NODE, MEMBER, SUPPORT, LOAD
-        self.nodes = []  # Lista de objetos Node (UI + Model)
-        self.members = []  # Lista de objetos Member (UI + Model)
+        self.mode = "SELECT"
+        self.nodes = []
+        self.members = []
+        self.temp_node = None
 
-        self.temp_node = None  # Para guardar o primeiro nó ao criar uma barra
+        # --- Layout Principal (Grid) ---
+        self.root.grid_columnconfigure(1, weight=1)
+        self.root.grid_rowconfigure(0, weight=1)
 
-        # --- Layout Principal ---
-        # Toolbar
-        self.toolbar = tk.Frame(root, bg="#ddd", height=40)
-        self.toolbar.pack(side=tk.TOP, fill=tk.X)
+        # 1. Barra Lateral (Sidebar)
+        self.sidebar = ctk.CTkFrame(root, width=200, corner_radius=0)
+        self.sidebar.grid(row=0, column=0, sticky="nsew")
+        
+        # Título da Barra
+        self.logo_label = ctk.CTkLabel(self.sidebar, text="FERRAMENTAS", font=ctk.CTkFont(size=20, weight="bold"))
+        self.logo_label.pack(padx=20, pady=(20, 10))
 
-        # Botões
-        self.btn_node = tk.Button(self.toolbar, text="Adicionar Nó", command=lambda: self.set_mode("NODE"))
-        self.btn_node.pack(side=tk.LEFT, padx=5, pady=5)
+        # Botões de Ferramentas
+        self.btn_node = ctk.CTkButton(self.sidebar, text="Adicionar Nó", command=lambda: self.set_mode("NODE"),
+                                      fg_color="#3B8ED0", hover_color="#36719F")
+        self.btn_node.pack(padx=20, pady=10)
 
-        self.btn_member = tk.Button(self.toolbar, text="Adicionar Barra", command=lambda: self.set_mode("MEMBER"))
-        self.btn_member.pack(side=tk.LEFT, padx=5, pady=5)
+        self.btn_member = ctk.CTkButton(self.sidebar, text="Adicionar Barra", command=lambda: self.set_mode("MEMBER"),
+                                        fg_color="#E19600", hover_color="#D08B00")
+        self.btn_member.pack(padx=20, pady=10)
 
-        self.btn_support = tk.Button(self.toolbar, text="Adicionar Apoio", command=lambda: self.set_mode("SUPPORT"))
-        self.btn_support.pack(side=tk.LEFT, padx=5, pady=5)
+        self.btn_support = ctk.CTkButton(self.sidebar, text="Adicionar Apoio", command=lambda: self.set_mode("SUPPORT"),
+                                         fg_color="#8D6F64", hover_color="#70554C")
+        self.btn_support.pack(padx=20, pady=10)
 
-        self.btn_load = tk.Button(self.toolbar, text="Adicionar Carga", command=lambda: self.set_mode("LOAD"))
-        self.btn_load.pack(side=tk.LEFT, padx=5, pady=5)
+        self.btn_load = ctk.CTkButton(self.sidebar, text="Adicionar Carga", command=lambda: self.set_mode("LOAD"),
+                                      fg_color="#9C27B0", hover_color="#7B1FA2")
+        self.btn_load.pack(padx=20, pady=10)
 
-        self.btn_calc = tk.Button(self.toolbar, text="CALCULAR", bg="#4CAF50", fg="white", command=self.calculate)
-        self.btn_calc.pack(side=tk.RIGHT, padx=20, pady=5)
+        # Separador e Ações
+        ctk.CTkLabel(self.sidebar, text="AÇÕES", font=ctk.CTkFont(size=14)).pack(pady=(20, 5))
 
-        self.btn_clear = tk.Button(self.toolbar, text="Limpar Tudo", command=self.clear_all)
-        self.btn_clear.pack(side=tk.RIGHT, padx=5)
+        self.btn_calc = ctk.CTkButton(self.sidebar, text="CALCULAR", command=self.calculate,
+                                      fg_color="#2CC985", hover_color="#229D68",
+                                      height=50, font=ctk.CTkFont(size=16, weight="bold"))
+        self.btn_calc.pack(padx=20, pady=10)
 
-        self.lbl_status = tk.Label(self.toolbar, text="Modo: Seleção", bg="#ddd")
-        self.lbl_status.pack(side=tk.LEFT, padx=20)
+        self.btn_clear = ctk.CTkButton(self.sidebar, text="Limpar Tudo", command=self.clear_all,
+                                       fg_color="transparent", border_width=2, text_color=("gray10", "#DCE4EE"))
+        self.btn_clear.pack(padx=20, pady=10)
 
-        # Canvas (Área de Desenho)
-        self.canvas = tk.Canvas(root, bg="white")
+        # Status Label
+        self.lbl_status = ctk.CTkLabel(self.sidebar, text="Modo: Seleção", font=ctk.CTkFont(size=12))
+        self.lbl_status.pack(side="bottom", pady=20)
+
+        # 2. Canvas (Área de Desenho)
+        # Usamos tk.Canvas normal pois ele é melhor para desenhar linhas/círculos complexos que o CTk
+        self.canvas_frame = ctk.CTkFrame(root)
+        self.canvas_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+        
+        self.canvas = tk.Canvas(self.canvas_frame, bg="white", highlightthickness=0)
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
         # Eventos do Mouse
@@ -64,25 +88,34 @@ class TrussApp:
     def set_mode(self, mode):
         self.mode = mode
         self.temp_node = None
-        self.lbl_status.config(text=f"Modo: {mode}")
+        
+        # Tradução simples para exibição
+        map_names = {
+            "NODE": "Adicionar Nós",
+            "MEMBER": "Adicionar Barras",
+            "SUPPORT": "Adicionar Apoios",
+            "LOAD": "Adicionar Cargas",
+            "SELECT": "Seleção"
+        }
+        display_text = map_names.get(mode, mode)
+        self.lbl_status.configure(text=f"Modo Atual: {display_text}")
         self.redraw()
 
     def draw_grid(self):
-        w = 2000  # Tamanho arbitrário grande
+        w = 2000
         h = 2000
+        # Grid mais suave
         for i in range(0, w, GRID_SIZE):
-            self.canvas.create_line([(i, 0), (i, h)], tag='grid', fill='#eee')
+            self.canvas.create_line([(i, 0), (i, h)], tag='grid', fill='#f0f0f0')
         for i in range(0, h, GRID_SIZE):
-            self.canvas.create_line([(0, i), (w, i)], tag='grid', fill='#eee')
+            self.canvas.create_line([(0, i), (w, i)], tag='grid', fill='#f0f0f0')
 
     def get_snapped_coords(self, event):
-        # Arredonda a posição do mouse para o grid mais próximo
         x = round(event.x / GRID_SIZE) * GRID_SIZE
         y = round(event.y / GRID_SIZE) * GRID_SIZE
         return x, y
 
     def find_node_at(self, x, y):
-        # Verifica se clicou perto de um nó existente
         for n in self.nodes:
             dist = math.sqrt((n.x - x) ** 2 + (n.y - y) ** 2)
             if dist < SNAP_TOLERANCE:
@@ -95,10 +128,7 @@ class TrussApp:
 
         if self.mode == "NODE":
             if not clicked_node:
-                # Cria novo nó
                 new_id = len(self.nodes) + 1
-                # Nota: Na interface Y cresce para baixo, na engenharia para cima.
-                # Vamos manter visual por enquanto e tratar Y no solver se necessário.
                 new_node = Node(id=new_id, x=x, y=y)
                 self.nodes.append(new_node)
                 self.redraw()
@@ -106,19 +136,16 @@ class TrussApp:
         elif self.mode == "MEMBER":
             if clicked_node:
                 if self.temp_node is None:
-                    # Selecionou o primeiro nó
                     self.temp_node = clicked_node
-                    self.redraw()  # Para mostrar destaque
+                    self.redraw()
                 else:
-                    # Selecionou o segundo nó -> criar barra
                     if clicked_node != self.temp_node:
-                        # Propriedades Padrão (Aço)
                         m = Member(
                             id=len(self.members) + 1,
                             start_node=self.temp_node,
                             end_node=clicked_node,
-                            elastic_modulus=200e9,  # 200 GPa
-                            area=0.005  # Padrão arbitrário
+                            elastic_modulus=200e9,
+                            area=0.005
                         )
                         self.members.append(m)
                         self.temp_node = None
@@ -126,9 +153,7 @@ class TrussApp:
 
         elif self.mode == "SUPPORT":
             if clicked_node:
-                # Pergunta tipo de apoio
-                tipo = simpledialog.askstring("Apoio",
-                                              "Digite 'P' para Pino (X e Y presos) ou 'R' para Rolet (apenas Y preso):")
+                tipo = simpledialog.askstring("Apoio", "Digite 'P' para Pino ou 'R' para Rolet:", parent=self.root)
                 if tipo:
                     tipo = tipo.upper()
                     if tipo == 'P':
@@ -139,38 +164,33 @@ class TrussApp:
 
         elif self.mode == "LOAD":
             if clicked_node:
-                mag = simpledialog.askfloat("Carga", "Magnitude da Força (N):")
-                ang = simpledialog.askfloat("Carga", "Ângulo (graus, 0=Direita, 90=Baixo, 270=Cima):")
+                mag = simpledialog.askfloat("Carga", "Magnitude da Força (N):", parent=self.root)
+                ang = simpledialog.askfloat("Carga", "Ângulo (graus):", parent=self.root)
                 if mag is not None and ang is not None:
                     clicked_node.load = Load(magnitude=mag, angle=ang)
                     self.redraw()
 
     def on_mouse_move(self, event):
-        # Apenas para feedback visual se quisesse desenhar linha "fantasma"
         pass
 
     def clear_all(self):
         self.nodes = []
         self.members = []
         self.temp_node = None
+        self.set_mode("SELECT")
         self.redraw()
 
     def calculate(self):
         if not self.nodes or not self.members:
-            messagebox.showwarning("Erro", "Desenhe uma estrutura primeiro!")
+            messagebox.showwarning("Aviso", "Desenhe uma estrutura primeiro!")
             return
 
-        # Monta a estrutura
         truss = Truss(nodes=self.nodes, members=self.members)
 
         try:
-            # CHAMA O SOLVER QUE CRIAMOS
             TrussSolver.solve(truss)
-
-            # Atualiza a tela com resultados
             self.redraw(show_results=True)
             messagebox.showinfo("Sucesso", "Cálculo realizado com sucesso!")
-
         except Exception as e:
             messagebox.showerror("Erro de Cálculo", str(e))
 
@@ -185,77 +205,69 @@ class TrussApp:
             text = ""
 
             if show_results:
-                # Lógica de Cores MDSolids: Vermelho=Compressão, Azul=Tração
-                if m.force < -1e-5:  # Compressão
-                    color = "red"
-                    thickness = 3
+                if m.force < -1e-5:
+                    color = "#E74C3C"  # Vermelho suave
+                    thickness = 4
                     text = f"{abs(m.force):.1f} N (C)"
-                elif m.force > 1e-5:  # Tração
-                    color = "blue"
-                    thickness = 3
+                elif m.force > 1e-5:
+                    color = "#3498DB"  # Azul suave
+                    thickness = 4
                     text = f"{m.force:.1f} N (T)"
                 else:
-                    color = "#555"  # Zero force
+                    color = "#95A5A6"
                     text = "0"
 
-            # Linha da barra
             x1, y1 = m.start_node.x, m.start_node.y
             x2, y2 = m.end_node.x, m.end_node.y
             self.canvas.create_line(x1, y1, x2, y2, fill=color, width=thickness, tags="member")
 
-            # Texto da força no meio da barra
             if show_results:
                 mx, my = (x1 + x2) / 2, (y1 + y2) / 2
-                self.canvas.create_text(mx, my - 10, text=text, fill=color, font=("Arial", 10, "bold"))
+                # Caixa de fundo para o texto ficar legível
+                self.canvas.create_rectangle(mx-30, my-10, mx+30, my+10, fill="white", outline="")
+                self.canvas.create_text(mx, my, text=text, fill=color, font=("Arial", 9, "bold"))
 
-        # Desenhar Nós e Apoios
+        # Desenhar Nós e Elementos
         for n in self.nodes:
-            # Cor do nó
             fill_col = "white"
-            if n == self.temp_node: fill_col = "yellow"
+            radius = NODE_RADIUS
+            
+            if n == self.temp_node: 
+                fill_col = "#F1C40F"  # Amarelo destaque
+                radius += 2
 
-            # Desenha Apoio (Triângulo simples)
+            # Desenha Apoio
             if n.support:
-                sx, sy = n.x, n.y + NODE_RADIUS + 5
-                if n.support.restrain_x and n.support.restrain_y:  # Pino
-                    self.canvas.create_polygon(n.x, n.y, n.x - 8, n.y + 12, n.x + 8, n.y + 12, fill="green",
-                                               outline="black")
-                else:  # Rolet
-                    self.canvas.create_oval(n.x - 8, n.y + 5, n.x + 8, n.y + 21, outline="green", width=2)
+                sx, sy = n.x, n.y + radius + 5
+                if n.support.restrain_x and n.support.restrain_y:
+                    self.canvas.create_polygon(n.x, n.y, n.x - 10, n.y + 15, n.x + 10, n.y + 15, fill="#27AE60", outline="black")
+                else:
+                    self.canvas.create_oval(n.x - 10, n.y + 5, n.x + 10, n.y + 25, outline="#27AE60", width=2)
 
-            # Desenha o Nó (Círculo)
-            self.canvas.create_oval(n.x - NODE_RADIUS, n.y - NODE_RADIUS,
-                                    n.x + NODE_RADIUS, n.y + NODE_RADIUS,
-                                    fill=fill_col, outline="black")
+            # Desenha o Nó
+            self.canvas.create_oval(n.x - radius, n.y - radius, n.x + radius, n.y + radius, fill=fill_col, outline="black", width=2)
+            self.canvas.create_text(n.x + 15, n.y - 15, text=str(n.id), fill="#7F8C8D", font=("Arial", 8))
 
-            # Desenha ID do Nó
-            self.canvas.create_text(n.x + 10, n.y + 10, text=str(n.id), fill="#666")
-
-            # Desenha Carga (Seta)
+            # Desenha Carga
             if n.load:
-                # Converter ângulo para coordenadas de tela
                 rad = math.radians(n.load.angle)
-                arrow_len = 40
-                # O vetor força aponta para (dx, dy)
+                arrow_len = 50
                 dx = arrow_len * math.cos(rad)
                 dy = arrow_len * math.sin(rad)
+                self.canvas.create_line(n.x, n.y, n.x + dx, n.y + dy, arrow=tk.LAST, fill="#8E44AD", width=3)
+                self.canvas.create_text(n.x + dx + 15, n.y + dy, text=f"{n.load.magnitude}N", fill="#8E44AD", font=("Arial", 10, "bold"))
 
-                # Desenhamos a seta chegando no nó ou saindo?
-                # Visualmente, melhor desenhar a seta 'empurrando' ou 'puxando' o nó.
-                # Vamos desenhar uma linha saindo do nó na direção da força
-                self.canvas.create_line(n.x, n.y, n.x + dx, n.y + dy, arrow=tk.LAST, fill="purple", width=3)
-                self.canvas.create_text(n.x + dx + 10, n.y + dy, text=f"{n.load.magnitude}N", fill="purple")
-
-            # Desenha Reações (após cálculo)
+            # Resultados das Reações
             if show_results and n.support:
                 rx, ry = n.reaction_x, n.reaction_y
+                label_y = n.y + 40
                 if abs(rx) > 0.1:
-                    self.canvas.create_text(n.x, n.y - 25, text=f"Rx:{rx:.1f}", fill="darkgreen")
+                    self.canvas.create_text(n.x, label_y, text=f"Rx:{rx:.1f}", fill="#16A085", font=("Arial", 9))
+                    label_y += 15
                 if abs(ry) > 0.1:
-                    self.canvas.create_text(n.x, n.y + 25, text=f"Ry:{ry:.1f}", fill="darkgreen")
-
+                    self.canvas.create_text(n.x, label_y, text=f"Ry:{ry:.1f}", fill="#16A085", font=("Arial", 9))
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = TrussApp(root)
-    root.mainloop()
+    app = ctk.CTk()  # Usando CTk em vez de Tk
+    gui = TrussApp(app)
+    app.mainloop()
