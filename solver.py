@@ -37,7 +37,7 @@ class TrussSolver:
                 ang_rad = np.deg2rad(node.load.angle)
 
                 F[xi] += mag * np.cos(ang_rad)
-                F[yi] += mag * np.sin(ang_rad)
+                F[yi] -= mag * np.sin(ang_rad)
 
         # 4. Identifica Restrições (Supports)
         # Criamos uma máscara booleana: True = Livre, False = Restrito
