@@ -15,7 +15,7 @@ SNAP_TOLERANCE = 15
 class TrussApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Truss Solver - Interface Moderna")
+        self.root.title("Truss Solver")
         self.root.geometry("1100x700")
 
         self.mode = "SELECT"
