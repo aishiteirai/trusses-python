@@ -5,7 +5,6 @@ import math
 from models import Node, Member, Truss, Support, Load
 from solver import TrussSolver
 
-# --- Configurações Visuais ---
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
 
@@ -19,34 +18,29 @@ class TrussApp:
         self.root.title("Truss Solver - Interface Moderna")
         self.root.geometry("1100x700")
 
-        # --- Estado da Aplicação ---
         self.mode = "SELECT"
         self.nodes = []
         self.members = []
         self.temp_node = None
 
-        # --- Layout Principal ---
         self.root.grid_columnconfigure(1, weight=1)
         self.root.grid_rowconfigure(0, weight=1)
 
-        # 1. Barra Lateral
         self.sidebar = ctk.CTkFrame(root, width=200, corner_radius=0)
         self.sidebar.grid(row=0, column=0, sticky="nsew")
         
         self.logo_label = ctk.CTkLabel(self.sidebar, text="FERRAMENTAS", font=ctk.CTkFont(size=20, weight="bold"))
         self.logo_label.pack(padx=20, pady=(20, 10))
 
-        # --- MELHORIA 1: Status em Destaque no Topo ---
         self.lbl_status = ctk.CTkLabel(self.sidebar, 
                                        text="Modo: Seleção", 
                                        font=ctk.CTkFont(size=14, weight="bold"),
-                                       fg_color="#555555",    # Cor inicial (Cinza)
+                                       fg_color="#555555",
                                        text_color="white",
                                        corner_radius=10,
                                        height=35)
         self.lbl_status.pack(padx=20, pady=(0, 20), fill="x")
 
-        # Botões
         self.btn_node = ctk.CTkButton(self.sidebar, text="Adicionar Nó", command=lambda: self.set_mode("NODE"),
                                       fg_color="#3B8ED0", hover_color="#36719F")
         self.btn_node.pack(padx=20, pady=10)
@@ -63,7 +57,6 @@ class TrussApp:
                                       fg_color="#9C27B0", hover_color="#7B1FA2")
         self.btn_load.pack(padx=20, pady=10)
 
-        # Ações
         ctk.CTkLabel(self.sidebar, text="AÇÕES", font=ctk.CTkFont(size=14)).pack(pady=(20, 5))
 
         self.btn_calc = ctk.CTkButton(self.sidebar, text="CALCULAR", command=self.calculate,
@@ -75,9 +68,6 @@ class TrussApp:
                                        fg_color="transparent", border_width=2, text_color=("gray10", "#DCE4EE"))
         self.btn_clear.pack(padx=20, pady=10)
 
-        # (Removi o lbl_status antigo daqui de baixo)
-
-        # 2. Canvas
         self.canvas_frame = ctk.CTkFrame(root)
         self.canvas_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
         
@@ -87,7 +77,6 @@ class TrussApp:
         self.canvas.bind("<Button-1>", self.on_click)
         self.draw_grid()
 
-    # --- JANELAS PERSONALIZADAS ---
     
     def open_support_dialog(self, node):
         dialog = ctk.CTkToplevel(self.root)
@@ -119,7 +108,6 @@ class TrussApp:
     def open_load_dialog(self, node):
         dialog = ctk.CTkToplevel(self.root)
         dialog.title("Adicionar Carga")
-        # MELHORIA 2: Ajuste de tamanho da janela
         dialog.geometry("300x320")
         dialog.resizable(False, False)
         dialog.transient(self.root)
@@ -146,23 +134,19 @@ class TrussApp:
                 entry_mag.configure(border_color="red")
                 entry_ang.configure(border_color="red")
 
-        # MELHORIA 2: Botão mais alto (height=40)
         ctk.CTkButton(dialog, text="Aplicar Carga", command=confirm, 
                       fg_color="#9C27B0", height=40, font=("Arial", 12, "bold")).pack(pady=20)
-
-    # --- LÓGICA DO PROGRAMA ---
 
     def set_mode(self, mode):
         self.mode = mode
         self.temp_node = None
         
-        # MELHORIA 1: Cores dinâmicas para o Status
         mode_data = {
-            "NODE":    ("Adicionar Nó", "#3B8ED0"),    # Azul
-            "MEMBER":  ("Adicionar Barra", "#E19600"), # Laranja
-            "SUPPORT": ("Adicionar Apoio", "#8D6F64"), # Marrom
-            "LOAD":    ("Adicionar Carga", "#9C27B0"), # Roxo
-            "SELECT":  ("Seleção", "#555555")          # Cinza
+            "NODE":    ("Adicionar Nó", "#3B8ED0"),
+            "MEMBER":  ("Adicionar Barra", "#E19600"), 
+            "SUPPORT": ("Adicionar Apoio", "#8D6F64"), 
+            "LOAD":    ("Adicionar Carga", "#9C27B0"), 
+            "SELECT":  ("Seleção", "#555555")          
         }
         
         text, color = mode_data.get(mode, (mode, "#555555"))
@@ -223,7 +207,7 @@ class TrussApp:
         self.nodes = []
         self.members = []
         self.temp_node = None
-        self.set_mode("SELECT") # Reseta para seleção ao limpar
+        self.set_mode("SELECT")
         self.redraw()
 
     def calculate(self):
@@ -242,7 +226,6 @@ class TrussApp:
         self.canvas.delete("all")
         self.draw_grid()
 
-        # Membros
         for m in self.members:
             color, width, text = "black", 2, ""
             if show_results:
@@ -258,28 +241,24 @@ class TrussApp:
                 self.canvas.create_rectangle(mx-30, my-10, mx+30, my+10, fill="white", outline="")
                 self.canvas.create_text(mx, my, text=text, fill=color, font=("Arial", 9, "bold"))
 
-        # Nós
         for n in self.nodes:
             fill = "#F1C40F" if n == self.temp_node else "white"
             
-            # Apoios
             if n.support:
-                if n.support.restrain_x: # Pino
+                if n.support.restrain_x:
                     self.canvas.create_polygon(n.x, n.y, n.x-10, n.y+15, n.x+10, n.y+15, fill="#27AE60", outline="black")
-                else: # Rolet
+                else: 
                     self.canvas.create_oval(n.x-10, n.y+5, n.x+10, n.y+25, outline="#27AE60", width=2)
 
             self.canvas.create_oval(n.x-NODE_RADIUS, n.y-NODE_RADIUS, n.x+NODE_RADIUS, n.y+NODE_RADIUS, fill=fill, outline="black")
             
-            # Cargas
             if n.load:
                 rad = math.radians(n.load.angle)
                 dx = 50 * math.cos(rad)
-                dy = -50 * math.sin(rad) # Correção Visual do Y
+                dy = -50 * math.sin(rad) 
                 self.canvas.create_line(n.x, n.y, n.x+dx, n.y+dy, arrow=tk.LAST, fill="#8E44AD", width=3)
                 self.canvas.create_text(n.x+dx+15, n.y+dy, text=f"{n.load.magnitude}N", fill="#8E44AD", font=("Arial", 10, "bold"))
 
-            # Reações (Texto)
             if show_results and n.support:
                 if abs(n.reaction_x) > 0.1: self.canvas.create_text(n.x, n.y+35, text=f"Rx:{n.reaction_x:.1f}", fill="#16A085")
                 if abs(n.reaction_y) > 0.1: self.canvas.create_text(n.x, n.y+50, text=f"Ry:{n.reaction_y:.1f}", fill="#16A085")
