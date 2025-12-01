@@ -23,6 +23,9 @@ class TrussApp:
         self.members = []
         self.temp_node = None
 
+        self.history = []  # Pilha para guardar as ações
+        self.root.bind("<Control-z>", self.undo)  # Atalho Ctrl+Z
+
         self.root.grid_columnconfigure(1, weight=1)
         self.root.grid_rowconfigure(0, weight=1)
 
@@ -77,6 +80,7 @@ class TrussApp:
         self.canvas.bind("<Button-1>", self.on_click)
         self.draw_grid()
 
+
     
     def open_support_dialog(self, node):
         dialog = ctk.CTkToplevel(self.root)
@@ -95,11 +99,14 @@ class TrussApp:
 
         def confirm():
             selection = combo_tipo.get()
+
+            self.history.append(("CHANGE_SUPPORT", (node, node.support)))
+
             if "Pino" in selection:
                 node.support = Support(restrain_x=True, restrain_y=True)
             else:
                 node.support = Support(restrain_x=False, restrain_y=True)
-            
+
             self.redraw()
             dialog.destroy()
 
@@ -127,6 +134,11 @@ class TrussApp:
             try:
                 mag = float(entry_mag.get())
                 ang = float(entry_ang.get())
+
+                # --- GUARDAR ESTADO ANTERIOR ---
+                self.history.append(("CHANGE_LOAD", (node, node.load)))
+                # -------------------------------
+
                 node.load = Load(magnitude=mag, angle=ang)
                 self.redraw()
                 dialog.destroy()
@@ -174,39 +186,51 @@ class TrussApp:
         return None
 
     def on_click(self, event):
-        x, y = self.get_snapped_coords(event)
-        clicked_node = self.find_node_at(x, y)
+            x, y = self.get_snapped_coords(event)
+            clicked_node = self.find_node_at(x, y)
 
-        if self.mode == "NODE":
-            if not clicked_node:
-                new_id = len(self.nodes) + 1
-                self.nodes.append(Node(id=new_id, x=x, y=y))
-                self.redraw()
+            if self.mode == "NODE":
+                if not clicked_node:
+                    new_id = len(self.nodes) + 1
+                    new_node = Node(id=new_id, x=x, y=y)  # Criar o objeto
+                    self.nodes.append(new_node)
 
-        elif self.mode == "MEMBER":
-            if clicked_node:
-                if self.temp_node is None:
-                    self.temp_node = clicked_node
+                    # --- ADICIONAR AO HISTÓRICO ---
+                    self.history.append(("ADD_NODE", new_node))
+                    # ------------------------------
+
                     self.redraw()
-                else:
-                    if clicked_node != self.temp_node:
-                        m = Member(id=len(self.members)+1, start_node=self.temp_node, end_node=clicked_node)
-                        self.members.append(m)
-                        self.temp_node = None
+
+            elif self.mode == "MEMBER":
+                if clicked_node:
+                    if self.temp_node is None:
+                        self.temp_node = clicked_node
                         self.redraw()
+                    else:
+                        if clicked_node != self.temp_node:
+                            m = Member(id=len(self.members) + 1, start_node=self.temp_node, end_node=clicked_node)
+                            self.members.append(m)
 
-        elif self.mode == "SUPPORT":
-            if clicked_node:
-                self.open_support_dialog(clicked_node)
+                            # --- ADICIONAR AO HISTÓRICO ---
+                            self.history.append(("ADD_MEMBER", m))
+                            # ------------------------------
 
-        elif self.mode == "LOAD":
-            if clicked_node:
-                self.open_load_dialog(clicked_node)
+                            self.temp_node = None
+                            self.redraw()
+
+            elif self.mode == "SUPPORT":
+                if clicked_node:
+                    self.open_support_dialog(clicked_node)
+
+            elif self.mode == "LOAD":
+                if clicked_node:
+                    self.open_load_dialog(clicked_node)
 
     def clear_all(self):
         self.nodes = []
         self.members = []
         self.temp_node = None
+        self.history = []  # Limpar o histórico também
         self.set_mode("SELECT")
         self.redraw()
 
@@ -221,6 +245,32 @@ class TrussApp:
             messagebox.showinfo("Sucesso", "Cálculo realizado com sucesso!")
         except Exception as e:
             messagebox.showerror("Erro", str(e))
+
+    def undo(self, event=None):
+        if not self.history:
+            return
+
+        action_type, data = self.history.pop()
+
+        if action_type == "ADD_NODE":
+            node_to_remove = data
+            if node_to_remove in self.nodes:
+                self.nodes.remove(node_to_remove)
+
+        elif action_type == "ADD_MEMBER":
+            member_to_remove = data
+            if member_to_remove in self.members:
+                self.members.remove(member_to_remove)
+
+        elif action_type == "CHANGE_SUPPORT":
+            node, old_support = data
+            node.support = old_support
+
+        elif action_type == "CHANGE_LOAD":
+            node, old_load = data
+            node.load = old_load
+
+        self.redraw()
 
     def redraw(self, show_results=False):
         self.canvas.delete("all")
